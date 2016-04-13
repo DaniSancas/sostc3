@@ -3,6 +3,7 @@
 import os
 import csv
 from sys import argv
+import pandas as pd
 
 
 lang_groups = {
@@ -134,52 +135,30 @@ lang_groups = {
 def merge_and_dump(inputdir, outputdir):
     """Groups relationed Language coefficient CSV files and generates chart-ready CSV files.
     Example of usage: $ coefficient_to_chart.py <input_dir> <output_dir>"""
-    # Get absolute paths, to avoid problems
-    abs_input_dir = os.path.abspath(inputdir)
-    abs_output_dir = os.path.abspath(outputdir)
     for lang in lang_groups:
         # For every group of languages, get absolute path to CSV files (keys) and formatted header name (values)
         # Returns two lists (key and value) sorted the same way (Alphabetical
         sorted_keys, lang_values = zip(*[(key, value) for key, value in sorted(lang_groups[lang].items())])
-        lang_keys = list(map(lambda x: os.path.join(abs_input_dir, "{}.csv".format(x)), sorted_keys))
+        lang_keys = list(map(lambda x: os.path.join(os.path.abspath(inputdir), "{}.csv".format(x)), sorted_keys))
 
-        with open(os.path.join(abs_output_dir, "{}.csv".format(lang)), 'w') as result_csv:
-            # Create CSV file for chart
-            result_writer = csv.writer(result_csv, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            buffer_csv = []  # 2-dimmension array containing each coefficient of each timelapse of each language
-            timelapse = []  # year-month-day array, filled once per group of languages
-            fill_timelapse = True
-            for key, lang_file in enumerate(lang_keys):
-                # For each language in the group
-                lang_coefficients = [lang_values[key]]  # Array with header (formatted language name) and coefficients
-                with open(lang_file) as source_csv:
-                    # Open file for reading and skip header row
-                    source_reader = csv.reader(source_csv, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                    next(source_reader)
+        csv_df = pd.DataFrame(columns=(('x',) + lang_values))
+        fill_timelapse = True
+        for key, lang_file in enumerate(lang_keys):
+            # For each language in the group
+            with open(lang_file) as source_csv:
+                # Open file for reading and skip header row
+                source_reader = csv.reader(source_csv, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                next(source_reader)
 
-                    for line in source_reader:
-                        # For each row, get coefficient and, if not already filled, get the year-month-day value
-                        lang_coefficients.append(line[2])
-                        if fill_timelapse:
-                            timelapse.append("{}-01".format(line[1]))
+                if fill_timelapse:
+                    timelapse = ["{}-01".format(line[1]) for line in source_reader]
+                    csv_df['x'] = pd.DataFrame.from_dict({'x': timelapse})  # Add X axis (time-series)
                     fill_timelapse = False  # Once the first language completed, stop retrieving year-month-day values
-                buffer_csv.append(lang_coefficients)  # Add the [header, coefficients...] array to buffer array
+                lang_coefficients = [line[2] for line in source_reader]
 
-            # Once every language in the group is retrieved, write the buffer array to chart CSV file
-            # Firstly, write the header
-            buffer_row = ["x"]  # First header item is "X" axis
-            for key, value in enumerate(buffer_csv):
-                # For every language in the group, write it's name as a new column
-                buffer_row.append(buffer_csv[key][0])
-            result_writer.writerow(buffer_row)
-
-            # Once the header is written, write a row for every timelapse, with year-month-day values and coefficients
-            for key_lapse, value_lapse in enumerate(timelapse):
-                buffer_row = [value_lapse]  # First item is year-month-day
-                for key, value in enumerate(buffer_csv):
-                    # For every language in the group, write the coefficient for the timelapse as a new column
-                    buffer_row.append(buffer_csv[key][key_lapse+1])  # Index equal to timelapse's index + 1
-                result_writer.writerow(buffer_row)
+            csv_df[lang_values[key]] = pd.DataFrame({lang_values[key]: lang_coefficients})  # Add each lang coefficient
+        # Dump DataFrame to CSV
+        csv_df.to_csv(os.path.join(os.path.abspath(outputdir), "{}.csv".format(lang)), index=False)
 
 
 if __name__ == "__main__":
