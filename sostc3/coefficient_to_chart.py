@@ -12,6 +12,7 @@ lang_groups = {
         "php": "PHP",
         "c": "C",
         "cpp": "C++",
+        "c-sharp": "C#",
         "python": "Python",
         "ruby": "Ruby",
         "go": "Go",
@@ -138,9 +139,9 @@ def merge_and_dump(inputdir, outputdir):
     abs_output_dir = os.path.abspath(outputdir)
     for lang in lang_groups:
         # For every group of languages, get absolute path to CSV files (keys) and formatted header name (values)
-        lang_keys = list(map(lambda x: os.path.join(abs_input_dir, "{}.csv".format(x)),
-                             sorted(list(lang_groups[lang].keys()))))
-        lang_values = sorted(list(lang_groups[lang].values()))
+        # Returns two lists (key and value) sorted the same way (Alphabetical
+        sorted_keys, lang_values = zip(*[(key, value) for key, value in sorted(lang_groups[lang].items())])
+        lang_keys = list(map(lambda x: os.path.join(abs_input_dir, "{}.csv".format(x)), sorted_keys))
 
         with open(os.path.join(abs_output_dir, "{}.csv".format(lang)), 'w') as result_csv:
             # Create CSV file for chart
